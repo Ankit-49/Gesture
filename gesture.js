@@ -376,33 +376,49 @@
         let hands;
         let videoElement = document.getElementById('video');
 
-        function setupHandTracking() {
-            hands = new Hands({
-                locateFile: (file) => {
-                    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-                }
-            });
+        async function setupHandTracking() {
+            const loadingElement = document.getElementById('loading');
+            const statusElement = document.getElementById('status');
 
-            hands.setOptions({
-                maxNumHands: 1,
-                modelComplexity: 1,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
+            if (!window.Hands || !window.Camera || !videoElement) {
+                loadingElement.style.display = 'none';
+                statusElement.textContent = 'Hand tracking unavailable';
+                statusElement.style.color = '#ff6b6b';
+                return;
+            }
 
-            hands.onResults(onHandsResults);
+            try {
+                hands = new Hands({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                    }
+                });
 
-            const camera = new Camera(videoElement, {
-                onFrame: async () => {
-                    await hands.send({ image: videoElement });
-                },
-                width: 640,
-                height: 480
-            });
+                hands.setOptions({
+                    maxNumHands: 1,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
 
-            camera.start();
-            
-            document.getElementById('loading').style.display = 'none';
+                hands.onResults(onHandsResults);
+
+                const camera = new Camera(videoElement, {
+                    onFrame: async () => {
+                        await hands.send({ image: videoElement });
+                    },
+                    width: 640,
+                    height: 480
+                });
+
+                await camera.start();
+                loadingElement.style.display = 'none';
+            } catch (error) {
+                loadingElement.style.display = 'none';
+                statusElement.textContent = 'Camera access failed';
+                statusElement.style.color = '#ff6b6b';
+                console.error('Hand tracking initialization failed:', error);
+            }
         }
 
         function onHandsResults(results) {
