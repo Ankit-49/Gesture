@@ -11,6 +11,8 @@
         // Gesture state
         let currentGesture = 'none';
         let handDetected = false;
+        let gestureHistory = [];
+        const gestureStabilityFrames = 4;
 
         // Color schemes
         const colorSchemes = [
@@ -396,9 +398,9 @@
 
                 hands.setOptions({
                     maxNumHands: 1,
-                    modelComplexity: 1,
-                    minDetectionConfidence: 0.5,
-                    minTrackingConfidence: 0.5
+                    modelComplexity: 0,
+                    minDetectionConfidence: 0.6,
+                    minTrackingConfidence: 0.6
                 });
 
                 hands.onResults(onHandsResults);
@@ -425,7 +427,8 @@
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 handDetected = true;
                 const landmarks = results.multiHandLandmarks[0];
-                const gesture = detectGesture(landmarks);
+                const rawGesture = detectGesture(landmarks);
+                const gesture = getStableGesture(rawGesture);
                 
                 if (gesture !== currentGesture) {
                     currentGesture = gesture;
@@ -437,18 +440,48 @@
             } else {
                 handDetected = false;
                 currentGesture = 'none';
+                gestureHistory = [];
                 document.getElementById('status').textContent = 'No hand detected';
                 document.getElementById('status').style.color = '#ff6b6b';
             }
         }
 
+        function getStableGesture(gesture) {
+            gestureHistory.push(gesture);
+
+            if (gestureHistory.length > gestureStabilityFrames) {
+                gestureHistory.shift();
+            }
+
+            const counts = {};
+            for (const item of gestureHistory) {
+                counts[item] = (counts[item] || 0) + 1;
+            }
+
+            let bestGesture = gesture;
+            let bestCount = 0;
+            for (const [name, count] of Object.entries(counts)) {
+                if (count > bestCount) {
+                    bestGesture = name;
+                    bestCount = count;
+                }
+            }
+
+            return bestCount >= 3 ? bestGesture : currentGesture;
+        }
+
         function detectGesture(landmarks) {
             // Extract key points
             const thumb_tip = landmarks[4];
+            const thumb_ip = landmarks[3];
             const index_tip = landmarks[8];
+            const index_pip = landmarks[6];
             const middle_tip = landmarks[12];
+            const middle_pip = landmarks[10];
             const ring_tip = landmarks[16];
+            const ring_pip = landmarks[14];
             const pinky_tip = landmarks[20];
+            const pinky_pip = landmarks[18];
             
             const thumb_mcp = landmarks[2];
             const index_mcp = landmarks[5];
@@ -486,34 +519,43 @@
             const middleExtended = middleRatio > 1.3;
             const ringExtended = ringRatio > 1.3;
             const pinkyExtended = pinkyRatio > 1.3;
-            const thumbExtended = thumbRatio > 1.2;
+            const thumbExtended = thumbRatio > 1.15;
+            const indexStraight = index_tip.y < index_pip.y;
+            const middleStraight = middle_tip.y < middle_pip.y;
+            const ringStraight = ring_tip.y < ring_pip.y;
+            const pinkyStraight = pinky_tip.y < pinky_pip.y;
+            const thumbStraight = thumb_tip.y < thumb_ip.y;
+            const palmScale = Math.max(distance(wrist, middle_mcp), 0.001);
 
             // Pinch gesture (thumb and index close)
             const thumbIndexDist = distance(thumb_tip, index_tip);
-            if (thumbIndexDist < 0.05 && !middleExtended && !ringExtended && !pinkyExtended) {
+            if (thumbIndexDist < palmScale * 0.32 && !middleExtended && !ringExtended && !pinkyExtended) {
                 return 'pinch';
             }
 
             // Open palm (all fingers extended)
-            if (indexExtended && middleExtended && ringExtended && pinkyExtended) {
+            if (indexExtended && middleExtended && ringExtended && pinkyExtended &&
+                indexStraight && middleStraight && ringStraight && pinkyStraight) {
                 return 'open_palm';
             }
 
             // THREE FINGERS gesture (index, middle, ring extended - pinky closed)
             // This replaces the fist gesture
-            if (indexExtended && middleExtended && ringExtended && !pinkyExtended) {
+            if (indexExtended && middleExtended && ringExtended && !pinkyExtended &&
+                indexStraight && middleStraight && ringStraight) {
                 return 'three_fingers';
             }
 
             // Peace sign (index and middle extended, others closed)
-            if (indexExtended && middleExtended && !ringExtended && !pinkyExtended) {
+            if (indexExtended && middleExtended && !ringExtended && !pinkyExtended &&
+                indexStraight && middleStraight) {
                 return 'peace';
             }
 
             // Thumbs up (only thumb extended, pointing up)
             if (thumbExtended && !indexExtended && !middleExtended && !ringExtended && !pinkyExtended) {
                 // Check if thumb is pointing up
-                if (thumb_tip.y < thumb_mcp.y - 0.05) {
+                if (thumbStraight && thumb_tip.y < thumb_mcp.y - 0.04) {
                     return 'thumbs_up';
                 }
             }
@@ -523,7 +565,7 @@
 
         function handleGesture(gesture) {
             const now = Date.now();
-            if (now - lastGestureTime < 500) return; // Debounce
+            if (now - lastGestureTime < 350) return; // Debounce
             
             lastGestureTime = now;
 
@@ -551,14 +593,12 @@
                     break;
 
                 case 'peace':
-                    // Trigger fireworks
-                    const oldTemplate = currentTemplate;
-                    currentTemplate = 'fireworks';
+                    // Switch to previous template
+                    currentTemplateIndex = (currentTemplateIndex - 1 + templates.length) % templates.length;
+                    currentTemplate = templates[currentTemplateIndex];
                     createParticleSystem();
-                    setTimeout(() => {
-                        currentTemplate = oldTemplate;
-                        createParticleSystem();
-                    }, 3000);
+                    document.getElementById('template-display').textContent = 
+                        `Template: ${currentTemplate.charAt(0).toUpperCase() + currentTemplate.slice(1)}`;
                     break;
 
                 case 'thumbs_up':

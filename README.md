@@ -7,7 +7,7 @@ A gesture-controlled 3D particle playground built with **Three.js** and **MediaP
 - **Open Palm**: Expands particles and eases back.
 - **Pinch**: Cycles color schemes.
 - **Three Fingers**: Switches to the next particle template.
-- **Peace Sign**: Triggers a temporary fireworks effect.
+- **Peace Sign**: Switches to the previous particle template.
 - **Thumbs Up**: Resets to default state.
 
 ## Available Particle Templates
