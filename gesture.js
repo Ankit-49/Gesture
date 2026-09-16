@@ -30,6 +30,7 @@
             'wave', 'tornado', 'constellation', 'atomic', 'phoenix'
         ];
         let currentTemplateIndex = 0;
+        const actionableGestures = new Set(['open_palm', 'pinch', 'three_fingers', 'peace', 'thumbs_up']);
 
         function initThreeJS() {
             const container = document.getElementById('container');
@@ -563,7 +564,76 @@
             return 'unknown';
         }
 
+        function formatTemplateName(templateName) {
+            if (templateName === 'dna') return 'DNA';
+
+            return templateName
+                .split('_')
+                .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                .join(' ');
+        }
+
+        function updateTemplateDisplay() {
+            document.getElementById('template-display').textContent = `Template: ${formatTemplateName(currentTemplate)}`;
+        }
+
+        function cycleTemplate(direction) {
+            currentTemplateIndex = (currentTemplateIndex + direction + templates.length) % templates.length;
+            currentTemplate = templates[currentTemplateIndex];
+            createParticleSystem();
+            updateTemplateDisplay();
+        }
+
+        function cycleColorScheme() {
+            currentColorScheme = (currentColorScheme + 1) % colorSchemes.length;
+            generateParticleTemplate(currentTemplate);
+            particleGeometry.attributes.color.needsUpdate = true;
+        }
+
+        function pulseExpansion() {
+            targetExpansion = 2.0;
+            setTimeout(() => { targetExpansion = 1.0; }, 2000);
+        }
+
+        function resetSceneState() {
+            currentTemplate = 'galaxy';
+            currentTemplateIndex = 0;
+            currentColorScheme = 0;
+            expansionFactor = 1.0;
+            targetExpansion = 1.0;
+            createParticleSystem();
+            updateTemplateDisplay();
+        }
+
+        function addKeyboardControls() {
+            document.addEventListener('keydown', (event) => {
+                const key = event.key.toLowerCase();
+
+                if (key === 'arrowright') {
+                    event.preventDefault();
+                    cycleTemplate(1);
+                } else if (key === 'arrowleft') {
+                    event.preventDefault();
+                    cycleTemplate(-1);
+                } else if (key === 'c') {
+                    cycleColorScheme();
+                } else if (key === 'r') {
+                    resetSceneState();
+                } else if (key === ' ' || key === 'spacebar') {
+                    event.preventDefault();
+                    pulseExpansion();
+                } else {
+                    return;
+                }
+
+                document.getElementById('status').textContent = 'Keyboard control active';
+                document.getElementById('status').style.color = '#00ff88';
+            });
+        }
+
         function handleGesture(gesture) {
+            if (!actionableGestures.has(gesture)) return;
+
             const now = Date.now();
             if (now - lastGestureTime < 350) return; // Debounce
             
@@ -571,45 +641,23 @@
 
             switch(gesture) {
                 case 'open_palm':
-                    // Expand particles
-                    targetExpansion = 2.0;
-                    setTimeout(() => { targetExpansion = 1.0; }, 2000);
+                    pulseExpansion();
                     break;
 
                 case 'pinch':
-                    // Change color scheme
-                    currentColorScheme = (currentColorScheme + 1) % colorSchemes.length;
-                    generateParticleTemplate(currentTemplate);
-                    particleGeometry.attributes.color.needsUpdate = true;
+                    cycleColorScheme();
                     break;
 
                 case 'three_fingers':
-                    // Switch template (REPLACED FIST GESTURE)
-                    currentTemplateIndex = (currentTemplateIndex + 1) % templates.length;
-                    currentTemplate = templates[currentTemplateIndex];
-                    createParticleSystem();
-                    document.getElementById('template-display').textContent = 
-                        `Template: ${currentTemplate.charAt(0).toUpperCase() + currentTemplate.slice(1)}`;
+                    cycleTemplate(1);
                     break;
 
                 case 'peace':
-                    // Switch to previous template
-                    currentTemplateIndex = (currentTemplateIndex - 1 + templates.length) % templates.length;
-                    currentTemplate = templates[currentTemplateIndex];
-                    createParticleSystem();
-                    document.getElementById('template-display').textContent = 
-                        `Template: ${currentTemplate.charAt(0).toUpperCase() + currentTemplate.slice(1)}`;
+                    cycleTemplate(-1);
                     break;
 
                 case 'thumbs_up':
-                    // Reset to default
-                    currentTemplate = 'galaxy';
-                    currentTemplateIndex = 0;
-                    currentColorScheme = 0;
-                    expansionFactor = 1.0;
-                    targetExpansion = 1.0;
-                    createParticleSystem();
-                    document.getElementById('template-display').textContent = 'Template: Galaxy';
+                    resetSceneState();
                     break;
             }
         }
@@ -618,4 +666,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             initThreeJS();
             setupHandTracking();
+            updateTemplateDisplay();
+            addKeyboardControls();
         });

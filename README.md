@@ -10,6 +10,14 @@ A gesture-controlled 3D particle playground built with **Three.js** and **MediaP
 - **Peace Sign**: Switches to the previous particle template.
 - **Thumbs Up**: Resets to default state.
 
+## Keyboard Controls (Fallback)
+
+- **Right Arrow**: Next particle template.
+- **Left Arrow**: Previous particle template.
+- **C**: Cycle color schemes.
+- **R**: Reset to default state.
+- **Space**: Expand particles and ease back.
+
 ## Reliability Notes
 
 - Gesture recognition uses short-term stabilization to reduce flicker before actions trigger.
